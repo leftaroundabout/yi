@@ -14,7 +14,7 @@ import           Control.Applicative              (Alternative ((<|>)))
 import           Control.Monad                    (void)
 import qualified Data.Attoparsec.Text             as P (string, try)
 import qualified Data.Text                        as T (pack)
-import           Yi.Command                       (cabalBuildE)
+import           Yi.Command                       (cabalBuildE, cabalRun)
 import           Yi.Keymap                        (Action (YiA))
 import           Yi.Keymap.Vim.Common             (EventString)
 import qualified Yi.Keymap.Vim.Ex.Commands.Common as Common (commandArgs, impureExCommand, parse)
@@ -27,9 +27,13 @@ import           Yi.MiniBuffer                    (CommandArguments (CommandArgu
 
 parse :: EventString -> Maybe ExCommand
 parse = Common.parse $ do
-    void $ P.try (P.string "cabal build") <|> P.try (P.string "cabal")
+    void $ P.try (P.string "cabal")
     args <- Common.commandArgs
     return $ Common.impureExCommand {
-        cmdShow = T.pack "cabal build"
-      , cmdAction = YiA $ cabalBuildE $ CommandArguments args
+        cmdShow = T.pack "cabal"
+      , cmdAction = YiA $ case args of
+          [] -> cabalBuildE $ CommandArguments []
+          (cabalMainCm:cabalArgs)
+             -> cabalRun cabalMainCm (const $ return ())
+                   $ CommandArguments cabalArgs
       }
