@@ -13,7 +13,7 @@ module Yi.Keymap.Vim.NormalMap (defNormalMap) where
 
 import           Prelude                    hiding (lookup)
 
-import           Lens.Micro.Platform        (use, (.=))
+import           Lens.Micro.Platform        (use, (.=), (^.))
 import           Control.Monad              (replicateM_, unless, void, when)
 import           Data.Char                  (ord)
 import           Data.HashMap.Strict        (lookup, insert)
@@ -28,7 +28,7 @@ import           Yi.Core                    (closeWindow, quitEditor)
 import           Yi.Editor
 import           Yi.Event                   (Event (Event), Key (KASCII, KEnter, KEsc, KTab), Modifier (MCtrl))
 import           Yi.File                    (fwriteE, openNewFile)
-import           Yi.History                 (historyPrefixSet, historyStart)
+import           Yi.History                 (historyPrefixSet, historyStart, History(..), Histories(..), dynKeyA)
 import           Yi.Keymap                  (YiM)
 import           Yi.Keymap.Keys             (char, ctrlCh, spec)
 import           Yi.Keymap.Vim.Common
@@ -501,6 +501,17 @@ finishRecordingMacroBinding = VimBindingE (f . T.unpack . _unEv)
 playMacroBinding :: VimBinding
 playMacroBinding = VimBindingE (f . T.unpack . _unEv)
     where f "@" (VimState { vsMode = Normal }) = PartialMatch
+          f "@:" (VimState { vsMode = Normal }) = WholeMatch $ do
+              Histories histories <- getEditorDyn
+              let ident = "minibuffer"
+                  History _cur cont _pref = histories ^. dynKeyA ident
+              case cont of
+                [] -> do
+                   printMsg $ "No items in " <> ident <> " history."
+                   return Drop
+                (lastEx:_) -> do
+                   scheduleActionStringForEval . Ev $ ":"<>lastEx<>"<CR>"
+                   return Finish
           f ['@', c] (VimState { vsMode = Normal
                                , vsRegisterMap = registers
                                , vsCount = mbCount }) = WholeMatch $ do
